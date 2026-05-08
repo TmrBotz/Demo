@@ -1,4 +1,4 @@
-name = "jstgbott"
+name = "fgmo"
 main = "workers.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -8,6 +8,6 @@ binding = "KV"
 id = "6cde3daaf348409aa8513ec82c53b791"
 
 [vars]
-BOT_USERNAME       = "tumhara_bot_username"
-WORKER_URL         = "https://jag.tmrbotz.workers.dev"
+BOT_USERNAME       = "SPUpdate4_Bot"
+WORKER_URL         = "https://fgmo.tmrbotz.workers.dev"
 FORCE_SUB_CHANNELS = "-1002205504138"
