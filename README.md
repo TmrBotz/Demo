@@ -1,137 +1,97 @@
-# 🗂️ Telegram FileStore Bot — Cloudflare Workers
+# 📦 Telegram File Store Bot — Cloudflare Workers
 
-A **production-grade, permanent file store Telegram bot** built on Cloudflare Workers + KV.  
-Files are stored via a private Telegram channel, links never expire, and serving is globally fast.
+TeleBot-style multi-file sharing bot with Force Subscribe, auto-delete, forward protection, and a web preview page.
 
 ---
 
 ## ✨ Features
 
-| Feature | Description |
+| Feature | Details |
 |---|---|
-| `/genlink` | Upload any file → get a permanent shareable link |
-| `/batch` | Upload multiple files → one batch page with all files |
-| Deep links | `t.me/bot?start=file_ID` — open files directly in Telegram |
-| Video streaming | Inline HTML5 player for video files |
-| Audio playback | In-browser audio player |
-| Image preview | Full-size image display |
-| Force subscribe | Users must join channels before using the bot |
-| Admin panel | Broadcast, ban, stats, delete via bot commands |
-| Rate limiting | Per-user request throttling via KV |
-| Dark UI | Mobile-responsive dark-themed file pages |
-| Webhook secured | `X-Telegram-Bot-Api-Secret-Token` validation |
-
----
-
-## 🏗️ Tech Stack
-
-- **Runtime:** Cloudflare Workers (V8 isolates, globally distributed)
-- **Storage:** Cloudflare KV (users, files, batches, sessions)
-- **File CDN:** Telegram's own CDN via `getFile` API
-- **Bot:** Telegram Bot API (webhook, no polling)
+| `/start` | Welcome screen |
+| `/start?start=ID` | Delivers all files of that bundle |
+| `/upload` | Admin — collect multiple files |
+| `✅` button | Finalize upload → get shareable link |
+| Force Subscribe | Multiple channels via Channel IDs |
+| Auto Delete | Files deleted after 15 minutes |
+| Forward Protection | Optional — prevent forwarding |
+| Custom Caption | Prefix/suffix on every file |
+| Web Preview | `/file/ID` — dark themed file list |
+| `/stats` | Admin — users & files count |
+| `/broadcast` | Admin — message all users |
 
 ---
 
 ## 📁 File Structure
 
 ```
-.
-├── workers.js       ← Main Cloudflare Worker
-├── wrangler.toml    ← Wrangler config
-└── README.md        ← This file
+workers.js      ← Main Cloudflare Worker
+wrangler.toml   ← Config file
+README.md       ← This file
 ```
 
 ---
 
-## 🚀 Deployment Guide
+## 🚀 Deployment Steps
 
-### 1. Prerequisites
-
+### Step 1 — Prerequisites
 ```bash
-# Install Node.js (v18+) and Wrangler CLI
 npm install -g wrangler
-
-# Login to Cloudflare
 wrangler login
 ```
 
-### 2. Create a Telegram Bot
-
-1. Message [@BotFather](https://t.me/BotFather) on Telegram
-2. Run `/newbot` and follow the steps
-3. Copy the **BOT_TOKEN** you receive
-4. Run `/setprivacy` → select your bot → **Disable** (so bot can read files in groups)
-
-### 3. Create a Storage Channel
-
-1. Create a **private Telegram channel** (this is your file database)
-2. Add your bot as an **administrator** with "Post Messages" permission
-3. Get the channel's numeric ID:
-   - Forward any message from the channel to [@userinfobot](https://t.me/userinfobot)
-   - Or use: `https://api.telegram.org/bot<TOKEN>/getUpdates` after posting to the channel
-   - It will look like `-1001234567890`
-
-### 4. Create KV Namespace
-
-```bash
-# Create the KV namespace
-wrangler kv:namespace create "KV"
-
-# You'll get output like:
-# [[kv_namespaces]]
-# binding = "KV"
-# id = "abc123..."
-
-# Paste the id into wrangler.toml
+### Step 2 — KV Namespace
+Already created. ID is in wrangler.toml:
+```
+6cde3daaf348409aa8513ec82c53b791
 ```
 
-### 5. Configure wrangler.toml
-
-Edit `wrangler.toml`:
+### Step 3 — Update wrangler.toml
 
 ```toml
 [vars]
-BOT_USERNAME        = "your_bot_username"    # e.g. "myfilestore_bot"
-WORKER_URL          = "https://telegram-filestore-bot.YOUR_SUBDOMAIN.workers.dev"
-FORCE_SUB_CHANNELS  = "@yourchannel"         # optional, comma-separated
+BOT_USERNAME       = "your_actual_bot_username"
+WORKER_URL         = "https://jag.tmrbotz.workers.dev"
+FORCE_SUB_CHANNELS = "-1001234567890,-1009876543210"
 ```
 
-### 6. Set Secrets
+**FORCE_SUB_CHANNELS format:**
+- Single channel:   `-1001234567890`
+- Multiple channels: `-1001234567890,-1009876543210,-1001122334455`
+- Leave empty `""` to disable force subscribe
 
-```bash
-# Required
-wrangler secret put BOT_TOKEN
-# Paste your bot token when prompted
+**How to get Channel ID:**
+1. Add @userinfobot to your channel
+2. Forward any channel message to @userinfobot
+3. It will show the numeric ID like `-1001234567890`
 
-wrangler secret put CHANNEL_ID
-# Paste your storage channel ID, e.g.: -1001234567890
+### Step 4 — Set Secrets (Cloudflare Dashboard)
 
-wrangler secret put ADMINS
-# Paste comma-separated Telegram user IDs, e.g.: 123456789,987654321
-
-wrangler secret put WEBHOOK_SECRET
-# Paste any random string, e.g.: my_super_secret_2024
+Go to:
+```
+https://dash.cloudflare.com → Workers & Pages → jag → Settings → Variables & Secrets
 ```
 
-### 7. Deploy to Cloudflare
+Add these as **Secrets (Encrypted)**:
 
+| Secret Name | Value |
+|---|---|
+| `BOT_TOKEN` | Your bot token from @BotFather |
+| `ADMINS` | Your Telegram user ID (e.g. `123456789`) |
+| `WEBHOOK_SECRET` | Any random string (e.g. `mybot_secret_2024`) |
+
+### Step 5 — Deploy
 ```bash
 wrangler deploy
 ```
 
-You'll get a URL like: `https://telegram-filestore-bot.YOUR_SUBDOMAIN.workers.dev`
+Or push to GitHub — auto deploys via Cloudflare Workers Builds.
 
-### 8. Register the Webhook
+### Step 6 — Set Webhook
 
-```bash
-# Replace values with your actual bot token, worker URL, and secret
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://telegram-filestore-bot.YOUR_SUBDOMAIN.workers.dev/webhook",
-    "secret_token": "YOUR_WEBHOOK_SECRET",
-    "allowed_updates": ["message", "callback_query"]
-  }'
+Open this URL in browser (replace values):
+```
+https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook?url=https://jag.tmrbotz.workers.dev/webhook&secret_token=YOUR_WEBHOOK_SECRET
 ```
 
 Expected response:
@@ -139,50 +99,58 @@ Expected response:
 {"ok":true,"result":true,"description":"Webhook was set"}
 ```
 
-### 9. Verify Webhook
+---
 
-```bash
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
+## ⚙️ Bot Configuration
+
+Edit top of `workers.js`:
+
+```js
+const CUSTOM_CAPTION_PREFIX = "@YourChannel ";       // added before every caption
+const CUSTOM_CAPTION_SUFFIX = "\n\nJoin @YourChannel"; // added after every caption
+const FORWARD_PROTECT       = true;   // true = users can't forward files
+const AUTO_DELETE_SECONDS   = 900;    // 900 = 15 minutes, 0 = never delete
 ```
 
 ---
 
-## ⚙️ Environment Variables Reference
+## 🔒 Force Subscribe Setup
 
-| Variable | Where to Set | Description |
-|---|---|---|
-| `BOT_TOKEN` | `wrangler secret put` | Telegram bot token from BotFather |
-| `BOT_USERNAME` | `wrangler.toml [vars]` | Bot username without @ |
-| `CHANNEL_ID` | `wrangler secret put` | Private storage channel ID (negative number) |
-| `ADMINS` | `wrangler secret put` | Comma-separated admin user IDs |
-| `WEBHOOK_SECRET` | `wrangler secret put` | Random string to validate webhook requests |
-| `WORKER_URL` | `wrangler.toml [vars]` | Your deployed worker URL |
-| `FORCE_SUB_CHANNELS` | `wrangler.toml [vars]` | Channels users must join (comma-separated) |
-| `KV` | `wrangler.toml [[kv_namespaces]]` | KV namespace binding |
+### 1. Create your channel(s)
+### 2. Add your bot as Admin with these permissions:
+- ✅ Post Messages
+- ✅ Invite Users via Link
+
+### 3. Get Channel ID
+Forward any message from the channel to [@userinfobot](https://t.me/userinfobot)
+
+### 4. Add to wrangler.toml
+```toml
+FORCE_SUB_CHANNELS = "-1001234567890"
+```
+
+### Multiple channels:
+```toml
+FORCE_SUB_CHANNELS = "-1001234567890,-1009876543210,-1001122334455"
+```
 
 ---
 
 ## 🤖 Bot Commands
 
 ### User Commands
-
 | Command | Description |
 |---|---|
-| `/start` | Welcome screen with inline keyboard |
-| `/genlink` | Start single file upload → get permanent link |
-| `/batch` | Start batch upload session |
-| `/done` | Finalize batch and generate batch link |
-| `/cancel` | Cancel current operation |
+| `/start` | Welcome + buttons |
+| `/start ID` | Receive all files of a bundle |
 
 ### Admin Commands
-
 | Command | Description |
 |---|---|
-| `/stats` | View total users, files, batches |
-| `/broadcast <message>` | Send message to all users |
-| `/delete <file_uid>` | Delete a stored file |
-| `/ban <user_id>` | Ban a user |
-| `/users` | View user count |
+| `/upload` | Start file upload session |
+| `/stats` | View total users & files |
+| `/broadcast msg` | Send message to all users |
+| `/cancel` | Cancel current session |
 
 ---
 
@@ -190,98 +158,58 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 
 | Route | Description |
 |---|---|
-| `POST /webhook` | Telegram webhook endpoint |
-| `GET /file/:id` | File page with download/stream |
-| `GET /batch/:id` | Batch page with all files |
+| `POST /webhook` | Telegram webhook |
+| `GET /file/:id` | Web preview page for file bundle |
 | `GET /ping` | Health check |
 
 ---
 
-## 📊 KV Data Schema
+## 📊 KV Data Structure
 
 ```
-file:<uid>       → { uid, file_id, file_unique_id, storage_message_id,
-                     file_name, file_size, mime_type, type, caption,
-                     thumbnail, uploaded_by, timestamp }
-
-batch:<uid>      → { id, files: [...], createdBy, timestamp }
-
-session:<userId> → { state, mode, files } — TTL: 1 hour
-
-user:<userId>    → { id, username, first_name, joined }
-
-banned:<userId>  → "1"
-
-counter:total_files   → "42"
-counter:total_users   → "10"
-counter:total_batches → "5"
-
-rl:<userId>      → { count, window } — rate limit tracker
+media:<id>        → JSON array of files in bundle
+session:<userId>  → Upload session state (TTL: 1hr)
+user:<userId>     → User info
+counter:total_files → Total files uploaded
+counter:total_users → Total registered users
+deletetask:...    → Pending auto-delete tasks
 ```
 
 ---
 
-## 🔒 Security Notes
+## ❓ Troubleshooting
 
-- All webhook requests are validated via `X-Telegram-Bot-Api-Secret-Token`
-- Rate limiting: 20 requests per 60 seconds per user
-- Banned users are blocked from all actions
-- Admin commands only work for IDs in `ADMINS`
-- File UIDs are 16-char cryptographically random strings
+**Force sub not working:**
+- Bot must be Admin in each force sub channel
+- Channel IDs must be negative numbers starting with `-100`
+- Check with: `https://api.telegram.org/botTOKEN/getChatMember?chat_id=-100xxx&user_id=YOUR_ID`
 
----
+**Files not sending:**
+- Check BOT_TOKEN secret is set correctly
+- Verify webhook is registered: `https://api.telegram.org/botTOKEN/getWebhookInfo`
 
-## 🐛 Troubleshooting
+**Auto delete not working:**
+- Cloudflare Workers has no background timer
+- Delete runs on next incoming webhook request
+- For exact timing, upgrade to Cloudflare Workers Cron Triggers (paid plan)
 
-**Webhook not receiving updates:**
-```bash
-# Check webhook status
-curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
-# Verify "url" and "last_error_message" fields
-```
-
-**KV reads returning null:**
-- Ensure KV namespace ID in `wrangler.toml` matches the created namespace
-- Check `wrangler kv:namespace list` to confirm
-
-**Bot can't copy files to storage channel:**
-- Confirm the bot is an admin in the channel with "Post Messages" permission
-- Verify `CHANNEL_ID` is the correct negative ID
-
-**Force subscribe not working:**
-- Ensure the bot is an admin (or at least a member) of the force-sub channels
-- Check the channel usernames are correct (with @)
+**ADMINS not working:**
+- Set as secret in Dashboard: `123456789` (just the number, no spaces)
+- Multiple admins: `123456789,987654321`
 
 ---
 
-## 📦 Quick Deploy (All Steps in One)
+## 📦 Quick Checklist
 
-```bash
-# 1. Install wrangler
-npm install -g wrangler && wrangler login
+- [ ] `wrangler.toml` — KV ID updated
+- [ ] `wrangler.toml` — BOT_USERNAME updated
+- [ ] `wrangler.toml` — WORKER_URL updated
+- [ ] `wrangler.toml` — FORCE_SUB_CHANNELS set
+- [ ] Dashboard Secret — BOT_TOKEN set
+- [ ] Dashboard Secret — ADMINS set
+- [ ] Dashboard Secret — WEBHOOK_SECRET set
+- [ ] Bot is Admin in storage channel
+- [ ] Bot is Admin in all force sub channels
+- [ ] Webhook registered via URL
+- [ ] Test `/start` in bot ✅
 
-# 2. Create KV
-wrangler kv:namespace create "KV"
-# Copy the id into wrangler.toml
-
-# 3. Edit wrangler.toml with your BOT_USERNAME and WORKER_URL
-
-# 4. Set secrets
-wrangler secret put BOT_TOKEN
-wrangler secret put CHANNEL_ID
-wrangler secret put ADMINS
-wrangler secret put WEBHOOK_SECRET
-
-# 5. Deploy
-wrangler deploy
-
-# 6. Set webhook
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-  -d '{"url":"<WORKER_URL>/webhook","secret_token":"<WEBHOOK_SECRET>","allowed_updates":["message","callback_query"]}'
-```
-
----
-
-## 📄 License
-
-MIT — free to use and modify.
