@@ -9,5 +9,5 @@ id = "6cde3daaf348409aa8513ec82c53b791"
 
 [vars]
 BOT_USERNAME       = "SPUpdate4_Bot"
-WORKER_URL         = "https://jstgbott.workers.dev"
+WORKER_URL         = "https://demot.workers.dev"
 FORCE_SUB_CHANNELS = "-1002205504138"
